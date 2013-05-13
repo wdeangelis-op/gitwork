@@ -1,0 +1,96 @@
+#/bin/sh
+
+MAKEBRANCH=$1
+FROMBRANCH=$2
+FROMREMOTE=$3
+SHOULD_DELETE=$2
+
+if [ -z "$MAKEBRANCH" ]; then
+	echo -e  "Usage: gitwork NEW_BRANCH_NAME [FROM_BRANCH] [REMOTE]"
+	echo -e  "Usage: gitwork --finish [DELETE_BRANCH]"
+	exit 1
+fi
+if [ "$MAKEBRANCH" == "--finish" ]; then
+	CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+	
+	if [ -z "$SHOULD_DELETE" ]; then
+		SHOULD_DELETE=$(git config gitwork.delete)
+	fi
+fi
+
+if [ -z "$FROMBRANCH" ]; then
+	FROMBRANCH=$(git config gitwork.branch)
+fi
+
+if [ -z "$FROMBRANCH" ]; then
+	FROMBRANCH=dev
+fi
+
+if [ -z "$FROMREMOTE" ]; then
+	FROMREMOTE=$(git config gitwork.remote)
+fi
+
+if [ -z "$FROMREMOTE" ]; then
+	FROMREMOTE=origin
+fi
+
+
+
+if [ -z "$CURRENT_BRANCH" ]; then
+	
+	echo -e "Getting latest version of \e[00;32m$FROMREMOTE\e[00m/\e[00;34m$FROMBRANCH\e[00m"
+
+	git checkout "$FROMBRANCH" >/dev/null 2>&1
+	RETCODE=$?
+	
+	if [ $RETCODE -ne 0 ]; then
+		echo -e "\e[00;31mCould not checkout primary branch $FROMBRANCH\e[00m"
+		exit 1
+	fi
+	
+	git pull "$FROMREMOTE" "$FROMBRANCH" >/dev/null 2>&1
+	git submodule update --recursive >/dev/null 2>&1
+	
+	RETCODE=$?
+	if [ $RETCODE -ne 0 ]; then
+		echo -e "\e[00;31mCould not merge latest version of $FROMREMOTE/$FROMBRANCH\e[00m"
+		exit 1	
+	fi
+
+	RESULT=$(git checkout -b "$MAKEBRANCH" 2>&1)
+	
+	RETCODE=$?
+	if [ $RETCODE -ne 0 ]; then
+		echo -e  "\e[00;31mCould not checkout new branch $MAKEBRANCH!"
+		echo "$RESULT"
+		exit 1
+	fi 
+
+	echo -e "Created new local branch \e[00;34m$MAKEBRANCH\e[00m" 
+else
+	echo -e  "Pushing work to \e[00;32m$FROMREMOTE\e[00m/\e[00;34m$CURRENT_BRANCH\e[00m"
+
+	git push "$FROMREMOTE" "$CURRENT_BRANCH" >/dev/null 2>&1
+	RETCODE=$?
+	
+	if [ $RETCODE -ne 0 ]; then
+		echo -e  "\e[00;31mFailed to push code to $FROMREMOTE/$CURRENT_BRANCH\e[00m"
+		exit $RETCODE
+	fi
+	
+	echo -e  "Checking out primary branch \e[00;34m$FROMBRANCH\e[00m"		
+
+	git checkout "$FROMBRANCH" >/dev/null 2>&1
+	
+	RETCODE=$?
+	
+	if [ $RETCODE -ne 0 ]; then
+		echo -e  "\e[00;31mCould not check ouy primary branch $FROMBRANCH\e[00m"
+		exit 1
+	fi	
+
+	if [ "$SHOULD_DELETE" == "1" ]; then	
+		echo -e  "\e[00;31mDeleting local branch: \e[00;34m$CURRENT_BRANCH\e[00m"		
+		git branch -D "$CURRENT_BRANCH" >/dev/null 2>&1
+	fi
+fi
