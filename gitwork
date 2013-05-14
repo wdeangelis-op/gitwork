@@ -8,6 +8,7 @@ SHOULD_DELETE=$2
 if [ -z "$MAKEBRANCH" ]; then
 	echo -e  "Usage: gitwork NEW_BRANCH_NAME [FROM_BRANCH] [REMOTE]"
 	echo -e  "Usage: gitwork --finish [DELETE_BRANCH]"
+	echo -e  "Usage: gitwork --show"
 	exit 1
 fi
 if [ "$MAKEBRANCH" == "--finish" ]; then
@@ -16,6 +17,12 @@ if [ "$MAKEBRANCH" == "--finish" ]; then
 	if [ -z "$SHOULD_DELETE" ]; then
 		SHOULD_DELETE=$(git config gitwork.delete)
 	fi
+fi
+if [ "$MAKEBRANCH" == "--show" ]; then
+	CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+	JIRA_URL=$(git config gitwork.jiraurl)
+	xdg-open "$JIRA_URL/browse/$CURRENT_BRANCH" & >/dev/null 2>&1 3>&1
+	exit 0
 fi
 
 if [ -z "$FROMBRANCH" ]; then
